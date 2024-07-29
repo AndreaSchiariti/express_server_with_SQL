@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import "express-async-errors";
 import morgan from "morgan";
 import dotenv from "dotenv";
@@ -38,24 +38,25 @@ const planetSchema = Joi.object({
   name: Joi.string().required(),
 });
 
-const planetNameSchema = Joi.object({
-  name: Joi.string().required(),
-});
 
-app.get("/api/planets", (req, res) => {
+app.get("/api/planets", (req: Request, res: Response) => {
   res.status(200).json(planets);
   console.log("Retrieved the planets");
 });
 
-app.get("/api/planets/:id", (req, res) => {
+app.get("/api/planets/:id", (req: Request, res: Response) => {
   const { id } = req.params;
   const planet = planets.find((world) => world.id === Number(id));
+
+  if (!planets.find((world) => world.id === Number(id))){
+    return res.status(404).json({msg: "Planet not found"})
+  }
 
   res.status(200).json(planet);
   console.log(`Retrieved selected planet`);
 });
 
-app.post("/api/planets", (req, res) => {
+app.post("/api/planets", (req: Request, res: Response) => {
   const { error, value } = planetSchema.validate(req.body, {
     abortEarly: false,
   });
@@ -74,16 +75,20 @@ app.post("/api/planets", (req, res) => {
   console.log("New Planet added to the list", planets);
 });
 
-app.put("/api/planets/:id", (req, res) => {
-  const { error, value } = planetNameSchema.validate(req.body);
+app.put("/api/planets/:id", (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  const { error, value } = planetSchema.validate({id, name});
+
+  if (!planets.find((world) => world.id === Number(id))){
+    return res.status(404).json({msg: "Planet not found"})
+  }
 
   if (error) {
     console.log(error.details);
     return res.status(400).json({ msg: "Wrong Parameter" });
   }
 
-  const { id } = req.params;
-  const { name } = req.body;
   planets = planets.map((world) =>
     world.id === Number(id) ? { ...world, name } : world
   );
@@ -92,7 +97,7 @@ app.put("/api/planets/:id", (req, res) => {
   res.status(200).json({ msg: "Planet updated" });
 });
 
-app.delete("/api/planets/:id", (req, res) => {
+app.delete("/api/planets/:id", (req: Request, res: Response) => {
   const { id } = req.params;
   planets = planets.filter((world) => world.id !== Number(id));
 
