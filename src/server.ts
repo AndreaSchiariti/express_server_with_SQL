@@ -1,10 +1,11 @@
 import express from "express";
 import "express-async-errors";
 import morgan from "morgan";
-import dotenv from "dotenv"
+import dotenv from "dotenv";
+import Joi from "joi";
 
 const app = express();
-dotenv.config()
+dotenv.config();
 const port = process.env.PORT_NUMBER;
 
 /* I'll leave out from the git.ignore the .env file for exercise reason,
@@ -32,28 +33,72 @@ let planets: Planets = [
   },
 ];
 
+const planetSchema = Joi.object({
+  id: Joi.number().required(),
+  name: Joi.string().required(),
+});
+
+const planetNameSchema = Joi.object({
+  name: Joi.string().required(),
+});
+
 app.get("/api/planets", (req, res) => {
   res.status(200).json(planets);
-  console.log("Retrieved the planets")
+  console.log("Retrieved the planets");
 });
 
 app.get("/api/planets/:id", (req, res) => {
-  const { id } = req.params
-  const planet = planets.find((world) => world.id === Number(id))
+  const { id } = req.params;
+  const planet = planets.find((world) => world.id === Number(id));
 
-  res.status(200).json(planet)
-  console.log(`Retrieved selected planet`)
+  res.status(200).json(planet);
+  console.log(`Retrieved selected planet`);
 });
 
 app.post("/api/planets", (req, res) => {
-  const {id, name} = req.body
-  const newPlanet = {id, name}
-  planets = [...planets, newPlanet]
+  const { error, value } = planetSchema.validate(req.body, {
+    abortEarly: false,
+  });
 
-  res.status(201).json({msg: "The planet was added"})
+  /* I use the abortEarly:false to see on the log if there is more than one error*/
+  if (error) {
+    console.log(error.details);
+    return res.status(400).json({ msg: "Wrong Parameters" });
+  }
+  const { id, name } = req.body;
+  const newPlanet = { id, name };
+  planets = [...planets, newPlanet];
 
-  console.log("New Planet added to the list", planets)
-})
+  res.status(201).json({ msg: "The planet was added" });
+
+  console.log("New Planet added to the list", planets);
+});
+
+app.put("/api/planets/:id", (req, res) => {
+  const { error, value } = planetNameSchema.validate(req.body);
+
+  if (error) {
+    console.log(error.details);
+    return res.status(400).json({ msg: "Wrong Parameter" });
+  }
+
+  const { id } = req.params;
+  const { name } = req.body;
+  planets = planets.map((world) =>
+    world.id === Number(id) ? { ...world, name } : world
+  );
+
+  console.log("Planet Updated", planets);
+  res.status(200).json({ msg: "Planet updated" });
+});
+
+app.delete("/api/planets/:id", (req, res) => {
+  const { id } = req.params;
+  planets = planets.filter((world) => world.id !== Number(id));
+
+  console.log(planets);
+  res.status(200).json({ msg: "Planet Deleted" });
+});
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
