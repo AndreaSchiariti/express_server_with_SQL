@@ -10,7 +10,8 @@ async function setupDb() {
 
     CREATE TABLE planets(
     id SERIAL NOT NULL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
+    name VARCHAR(255) NOT NULL,
+    image VARCHAR(255)
     );
     `);
 
@@ -117,7 +118,7 @@ async function updateById(req: Request, res: Response) {
       return res.status(404).json({ msg: "Planet not found" });
     }
   } catch (error) {
-    res.status(500).json({ msg: "Error Creating New Planet" });
+    res.status(500).json({ msg: "Error updating the Planet" });
     console.error(error);
   }
 }
@@ -130,9 +131,32 @@ async function deleteById(req: Request, res: Response) {
     console.log("Planet Deleted");
     res.status(200).json({ msg: "Planet Deleted" });
   } catch (error) {
-    res.status(500).json({ msg: "Error Creating New Planet" });
+    res.status(500).json({ msg: "Error Deleting the planet" });
     console.error(error);
   }
 }
 
-export { getAll, getOneById, create, updateById, deleteById };
+async function createImage(req: Request, res: Response) {
+  const { id } = req.params;
+  const fileName = req.file?.path;
+
+  console.log(req.file)
+
+  if (fileName) {
+    try {
+      await db.none(`UPDATE planets SET image=$2 WHERE id=$1`, [
+        Number(id),
+        fileName,
+      ]);
+      res.status(201).json({ msg: "Planet image uploaded successfully" });
+      console.log("Planet image uploaded succesfully");
+    } catch (error) {
+      res.status(500).json({ msg: "Error Uploading the image" });
+      console.error(error);
+    }
+  } else {
+    res.status(400).json({ msg: "Planet image failed to upload" });
+  }
+}
+
+export { getAll, getOneById, create, updateById, deleteById, createImage };
