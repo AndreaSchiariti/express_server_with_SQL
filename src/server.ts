@@ -12,14 +12,15 @@ import {
 } from "./controllers/planets.js";
 import multer from "multer"
 import fs from "fs"
+import { login, logOut, signuUp } from "./controllers/users.js";
+import authorize from "./authorize.js";
+import "./passport.js"
 
 const app = express();
 dotenv.config();
 const port = process.env.PORT_NUMBER_SERVER;
 
-/* I'll leave out from the git.ignore the .env file for exercise reason,
-usually I'd include it in the ignoring file and avoid
-sharing it in the repo */
+/* Added .env to the .gitignore */
 const uploadDir = "./uploads";
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
@@ -50,7 +51,11 @@ app.put("/api/planets/:id", updateById);
 
 app.delete("/api/planets/:id", deleteById);
 
-app.post("/api/planets/:id/image", upload.single("image"), createImage)
+app.post("/api/planets/:id/image", upload.single("image"), authorize, createImage)
+
+app.post("/api/users/signup", signuUp)
+app.post("/api/users/login", login)
+app.get("/api/users/logout", authorize, logOut)
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
