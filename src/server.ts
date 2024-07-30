@@ -11,7 +11,7 @@ import {
 } from "./controllers/planets.js";
 const app = express();
 dotenv.config();
-const port = process.env.PORT_NUMBER;
+const port = process.env.PORT_NUMBER_SERVER;
 
 /* I'll leave out from the git.ignore the .env file for exercise reason,
 usually I'd include it in the ignoring file and avoid

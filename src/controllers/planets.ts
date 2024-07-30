@@ -1,48 +1,75 @@
 import { Request, Response } from "express";
 import Joi from "joi";
+import pgPromise from "pg-promise";
 
-type Planet = {
-  id: number;
-  name: string;
-};
+const db = pgPromise()("postgres://postgres:postgres@localhost:5432/tutor");
 
-type Planets = Planet[];
+async function setupDb() {
+  await db.none(`
+    DROP TABLE IF EXISTS planets;
 
-let planets: Planets = [
-  {
-    id: 1,
-    name: "Earth",
-  },
-  {
-    id: 2,
-    name: "Mars",
-  },
-];
+    CREATE TABLE planets(
+    id SERIAL NOT NULL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
+    );
+    `);
 
-const planetSchema = Joi.object({
-  id: Joi.number().required(),
+  await db.none(`INSERT INTO planets (name) VALUES ('Earth'), ('Mars')`);
+
+  const planets = await db.many(`SELECT * FROM planets;`);
+
+  console.log(planets);
+}
+
+setupDb();
+
+const updatePlanetSchema = Joi.object({
+  id: Joi.number().integer().required(),
   name: Joi.string().required(),
 });
 
-function getAll(req: Request, res: Response) {
-  res.status(200).json(planets);
-  console.log("Retrieved the planets");
-}
+const planetSchema = Joi.object({
+  name: Joi.string().required(),
+});
 
-function getOneById(req: Request, res: Response) {
-  const { id } = req.params;
-  const planet = planets.find((world) => world.id === Number(id));
-
-  if (!planets.find((world) => world.id === Number(id))) {
-    return res.status(404).json({ msg: "Planet not found" });
+async function getAll(req: Request, res: Response) {
+  try {
+    const planets = await db.many(`SELECT * FROM planets`);
+    res.status(200).json(planets);
+    console.log("Retrieved the planets");
+  } catch (error) {
+    res.status(500).json({ msg: "Error Retrieveng Planets" });
+    console.error(error);
   }
-
-  res.status(200).json(planet);
-  console.log(`Retrieved selected planet`);
 }
 
-function create(req: Request, res: Response) {
-  const { error, value } = planetSchema.validate(req.body, {
+async function getOneById(req: Request, res: Response) {
+  const { id } = req.params;
+
+  try {
+    const planet = await db.oneOrNone(
+      `SELECT * FROM planets WHERE id=$1`,
+      Number(id)
+    );
+
+    if (planet) {
+      res.status(200).json(planet);
+      console.log(`Retrieved selected planet`);
+    } else {
+      res.status(404).json({ msg: "Planet not found" });
+      console.log("Planet not found");
+    }
+  } catch (error) {
+    res.status(500).json({ msg: "Error Retrieveng Planet" });
+    console.error(error);
+  }
+}
+
+async function create(req: Request, res: Response) {
+  const { name } = req.body;
+  const newPlanet = { name };
+
+  const { error, value } = planetSchema.validate(newPlanet, {
     abortEarly: false,
   });
 
@@ -51,45 +78,61 @@ function create(req: Request, res: Response) {
     console.log(error.details);
     return res.status(400).json({ msg: "Wrong Parameters" });
   }
-  const { id, name } = req.body;
-  const newPlanet = { id, name };
-  planets = [...planets, newPlanet];
 
-  res.status(201).json({ msg: "The planet was added" });
+  try {
+    await db.none(`INSERT INTO planets (name) VALUES ($1)`, name);
+    res.status(201).json({ msg: "The planet was added" });
 
-  console.log("New Planet added to the list", planets);
+    console.log("New Planet added to the list");
+  } catch (error) {
+    res.status(500).json({ msg: "Error Creating New Planet" });
+    console.error(error);
+  }
 }
 
-function updateById(req: Request, res: Response) {
+async function updateById(req: Request, res: Response) {
   const { id } = req.params;
   const { name } = req.body;
-  const { error, value } = planetSchema.validate({ id, name });
-
-  if (!planets.find((world) => world.id === Number(id))) {
-    return res.status(404).json({ msg: "Planet not found" });
-  }
+  const { error, value } = updatePlanetSchema.validate({ id, name });
 
   if (error) {
     console.log(error.details);
     return res.status(400).json({ msg: "Wrong Parameter" });
   }
 
-  planets = planets.map((world) =>
-    world.id === Number(id) ? { ...world, name } : world
-  );
+  try {
+    const planet = await db.oneOrNone(
+      `SELECT * FROM planets WHERE id=$1`,
+      Number(id)
+    );
+    if (planet) {
+      await db.none(`UPDATE planets set name=$2 WHERE id=$1`, [
+        Number(id),
+        name,
+      ]);
 
-  console.log("Planet Updated", planets);
-  res.status(200).json({ msg: "Planet updated" });
+      res.status(200).json({ msg: "Planet updated" });
+      console.log("Planet Updated");
+    } else {
+      return res.status(404).json({ msg: "Planet not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ msg: "Error Creating New Planet" });
+    console.error(error);
+  }
 }
 
-function deleteById(req: Request, res: Response) {
+async function deleteById(req: Request, res: Response) {
   const { id } = req.params;
-  planets = planets.filter((world) => world.id !== Number(id));
 
-  console.log(planets);
-  res.status(200).json({ msg: "Planet Deleted" });
+  try {
+    await db.none(`DELETE FROM planets WHERE id=$1`, Number(id));
+    console.log("Planet Deleted");
+    res.status(200).json({ msg: "Planet Deleted" });
+  } catch (error) {
+    res.status(500).json({ msg: "Error Creating New Planet" });
+    console.error(error);
+  }
 }
 
-export {
-  getAll, getOneById, create, updateById, deleteById
-}
+export { getAll, getOneById, create, updateById, deleteById };
